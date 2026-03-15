@@ -1,0 +1,10 @@
+name: ray-env-chatgpt
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - torch
+    - torchvision
+    - ray[default]

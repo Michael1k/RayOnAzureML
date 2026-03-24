@@ -1,3 +1,4 @@
+import argparse
 import os
 import ray
 import torch
@@ -37,18 +38,30 @@ class Net(nn.Module):
         return x
 
 @ray.remote
-def train_worker():
+def train_worker(data_dir):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     transform = transforms.Compose([transforms.ToTensor()])
+    
+    '''
     train_dataset = datasets.FashionMNIST(
-        root="./data",
+        root="../data",
         train=True,
-        download=True,
+        download=False,
         transform=transform
     )
+    '''
+    # Allow the specific class to be loaded securely
+    #torch.serialization.add_safe_globals([torchvision.datasets.mnist.FashionMNIST])
 
-    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    data_path = os.path.join(data_dir, "train.pt")
+    train_data = torch.load(data_path, weights_only=False)
+    
+    # Expected: torch.Size([60000, 28, 28])
+    print(f"Images Shape: {train_data.data.shape}")
+
+    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
+    #train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 
     model = Net().to(device)
     criterion = nn.CrossEntropyLoss()
@@ -70,6 +83,10 @@ def train_worker():
 
 
 if __name__ == "__main__":
-    futures = [train_worker.remote() for _ in range(2)]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", type=str, help="Path to mounted dataset")
+    args = parser.parse_args()
+
+    futures = [train_worker.remote(args.data_dir) for _ in range(2)]
     results = ray.get(futures)
     print(results)
